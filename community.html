@@ -12,6 +12,28 @@
 @media(max-width:1100px){.app{grid-template-columns:68px 290px minmax(300px,1fr)}.right{display:none}}
 @media(max-width:700px){.app{height:100dvh;display:block}.rail{display:none}.sidebar{height:100dvh;border:0}.chat{display:none;height:100dvh}.app.chatopen .sidebar{display:none}.app.chatopen .chat{display:flex}.mobiletop{display:flex;align-items:center;justify-content:space-between;padding:17px 16px;border-bottom:1px solid var(--line)}.mobiletabs{display:flex;position:fixed;bottom:0;left:0;right:0;background:#0d1520;border-top:1px solid var(--line);padding:9px 6px;justify-content:space-around}.mobiletabs button{border:0;background:none;color:var(--muted);font-size:10px}.mobiletabs button b{display:block;font-size:18px}.sidehead{padding-top:12px}.list{padding-bottom:80px}.chathead{height:66px;padding:0 12px}.messages{padding:18px 13px 14px}.msg{max-width:88%}.composer{padding:10px}.back{display:inline-block!important}.right{display:none}}
 .back{display:none}
+
+#tpAuthModal{display:none;position:fixed;inset:0;z-index:50;background:rgba(3,7,13,.82);backdrop-filter:blur(14px);padding:18px;place-items:center}
+#tpAuthModal.open{display:grid}
+.tp-auth-card{width:min(440px,100%);background:linear-gradient(160deg,#172435,#0d1520 72%);border:1px solid #3a4b60;border-radius:24px;padding:26px;box-shadow:0 28px 90px #000b;position:relative}
+.tp-auth-close{position:absolute;right:16px;top:16px}
+.tp-auth-mark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(145deg,#1d9bf0,#0756a8);font-size:24px;font-weight:900;margin-bottom:18px}
+.tp-auth-title{font-size:23px;font-weight:850;letter-spacing:-.03em;margin:0 0 6px}
+.tp-auth-sub{color:#9baabd;font-size:12px;margin:0 0 20px;line-height:1.6}
+.tp-auth-tabs{display:grid;grid-template-columns:1fr 1fr;background:#0a111b;border:1px solid #29394c;border-radius:12px;padding:4px;gap:4px;margin-bottom:18px}
+.tp-auth-tabs button{border:0;border-radius:9px;padding:9px;background:transparent;color:#9baabd;font-weight:750}
+.tp-auth-tabs button.active{background:#26384d;color:#f3dca4}
+.tp-auth-label{display:block;color:#b8c5d5;font-size:11px;font-weight:750;margin:12px 0 7px}
+.tp-auth-input{width:100%;border:1px solid #35485e;background:#09111b;color:#f4f2ec;border-radius:12px;padding:13px 14px;outline:none}
+.tp-auth-input:focus{border-color:#d8b66b;box-shadow:0 0 0 3px #d8b66b22}
+.tp-auth-primary{width:100%;border:0;border-radius:12px;padding:13px;margin-top:16px;background:linear-gradient(135deg,#f0d99f,#bd9650);color:#1b160c;font-weight:900}
+.tp-auth-secondary{border:0;background:transparent;color:#e6c982;font-weight:750;padding:10px}
+.tp-auth-code{letter-spacing:.42em;text-align:center;font-size:22px;font-weight:850}
+.tp-auth-msg{min-height:20px;color:#e8cb85;font-size:11px;margin-top:12px;line-height:1.5}
+.tp-auth-foot{color:#73849a;font-size:10px;text-align:center;margin-top:18px;line-height:1.6}
+.tp-auth-hidden{display:none!important}
+@media(max-width:480px){.tp-auth-card{padding:22px;border-radius:20px}.tp-auth-title{font-size:21px}}
+
 </style>
 </head>
 <body>
@@ -100,6 +122,30 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
 })();
 </script>
 
+
+<div id="tpAuthModal" aria-hidden="true">
+ <section class="tp-auth-card" role="dialog" aria-modal="true" aria-labelledby="tpAuthTitle">
+  <button class="iconbtn tp-auth-close" id="tpAuthClose" type="button" aria-label="Close">✕</button>
+  <div class="tp-auth-mark">✦</div>
+  <h2 class="tp-auth-title" id="tpAuthTitle">Welcome to Telegram Pro</h2>
+  <p class="tp-auth-sub" id="tpAuthSubtitle">Sign in or create your account securely with a one-time email code.</p>
+  <div class="tp-auth-tabs" id="tpAuthTabs"><button type="button" class="active" data-mode="signin">Log in</button><button type="button" data-mode="signup">Sign up</button></div>
+  <div id="tpAuthEmailStep">
+   <label class="tp-auth-label" for="tpAuthEmail">Email address</label>
+   <input class="tp-auth-input" id="tpAuthEmail" type="email" autocomplete="email" placeholder="name@example.com" maxlength="254">
+   <button class="tp-auth-primary" id="tpAuthSend" type="button">Continue with email</button>
+  </div>
+  <div id="tpAuthCodeStep" class="tp-auth-hidden">
+   <label class="tp-auth-label" for="tpAuthCode">6-digit verification code</label>
+   <input class="tp-auth-input tp-auth-code" id="tpAuthCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+   <button class="tp-auth-primary" id="tpAuthVerify" type="button">Verify & continue</button>
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><button class="tp-auth-secondary" id="tpAuthBack" type="button">← Change email</button><button class="tp-auth-secondary" id="tpAuthResend" type="button" disabled>Resend in 60s</button></div>
+  </div>
+  <div class="tp-auth-msg" id="tpAuthMessage" role="status" aria-live="polite"></div>
+  <div class="tp-auth-foot">By continuing, you agree to use the community respectfully. Never share your verification code with anyone.</div>
+ </section>
+</div>
+
 <!-- Telegram Pro backend client: email OTP is available; SMS needs a configured provider. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <script>
@@ -115,18 +161,44 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  status.textContent='Telegram Pro · Guest preview';
  document.body.appendChild(status);
  const note=t=>{status.textContent=t;};
- const auth=async()=>{
-  const email=prompt('Enter your email address to receive a sign-in code:');
-  if(!email)return;
-  const {error}=await client.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:true}});
-  note(error?'Sign-in request failed: '+error.message:'Verification code sent to your email. Verify it using the prompt on return.');
-  if(error)return;
-  const token=prompt('Enter the 6-digit code from your email:');
-  if(!token)return;
-  const result=await client.auth.verifyOtp({email:email.trim(),token:token.trim(),type:'email'});
-  if(result.error){note('Verification failed: '+result.error.message);return;}
-  me=result.data.user; window.tpMe=me; note('Signed in · '+(me.email||'Telegram Pro member')); await setupProfile(); await loadMyChats();
- };
+ let authEmail='',authMode='signin',resendTimer=null,resendLeft=0;
+ const authModal=$('tpAuthModal'),authMessage=$('tpAuthMessage');
+ const authMsg=t=>{authMessage.textContent=t;note(t);};
+ const openAuth=()=>{authModal.classList.add('open');authModal.setAttribute('aria-hidden','false');$('tpAuthEmail').focus();};
+ const closeAuth=()=>{authModal.classList.remove('open');authModal.setAttribute('aria-hidden','true');};
+ function setAuthMode(mode){authMode=mode;$('tpAuthTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$('tpAuthTitle').textContent=mode==='signup'?'Create your account':'Welcome back';$('tpAuthSubtitle').textContent=mode==='signup'?'Join Telegram Pro with a secure one-time email code.':'Log in securely with a one-time email code.';authMsg('');}
+ function startResendTimer(){clearInterval(resendTimer);resendLeft=60;$('tpAuthResend').disabled=true;$('tpAuthResend').textContent='Resend in 60s';resendTimer=setInterval(()=>{resendLeft--;if(resendLeft<=0){clearInterval(resendTimer);$('tpAuthResend').disabled=false;$('tpAuthResend').textContent='Resend code';}else $('tpAuthResend').textContent='Resend in '+resendLeft+'s';},1000);}
+ async function sendAuthCode(isResend=false){
+  const email=(authEmail||$('tpAuthEmail').value).trim().toLowerCase();
+  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){authMsg('Please enter a valid email address.');return;}
+  authEmail=email;$('tpAuthSend').disabled=true;$('tpAuthSend').textContent='Sending code…';
+  const {error}=await client.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
+  $('tpAuthSend').disabled=false;$('tpAuthSend').textContent='Continue with email';
+  if(error){authMsg('Could not send code: '+error.message+' · Check spam or wait before retrying.');return;}
+  $('tpAuthEmailStep').classList.add('tp-auth-hidden');$('tpAuthCodeStep').classList.remove('tp-auth-hidden');$('tpAuthCode').focus();
+  authMsg('If email delivery is enabled, a verification email has been requested for '+email+'. Check Inbox, Spam and Promotions.');
+  startResendTimer();
+ }
+ async function verifyAuthCode(){
+  const token=$('tpAuthCode').value.replace(/\\D/g,'');
+  if(token.length!==6){authMsg('Enter the complete 6-digit code.');return;}
+  $('tpAuthVerify').disabled=true;$('tpAuthVerify').textContent='Verifying…';
+  const result=await client.auth.verifyOtp({email:authEmail,token,type:'email'});
+  $('tpAuthVerify').disabled=false;$('tpAuthVerify').textContent='Verify & continue';
+  if(result.error){authMsg('Verification failed: '+result.error.message);return;}
+  me=result.data.user;window.tpMe=me;closeAuth();note('Signed in · '+(me.email||'Telegram Pro member'));await setupProfile();await loadMyChats();
+ }
+ $('tpAuthClose').addEventListener('click',closeAuth);
+ authModal.addEventListener('click',e=>{if(e.target===authModal)closeAuth();});
+ $('tpAuthTabs').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setAuthMode(b.dataset.mode)));
+ $('tpAuthSend').addEventListener('click',()=>sendAuthCode(false));
+ $('tpAuthVerify').addEventListener('click',verifyAuthCode);
+ $('tpAuthCode').addEventListener('input',()=>{$('tpAuthCode').value=$('tpAuthCode').value.replace(/\\D/g,'').slice(0,6);});
+ $('tpAuthCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyAuthCode();});
+ $('tpAuthEmail').addEventListener('keydown',e=>{if(e.key==='Enter')sendAuthCode(false);});
+ $('tpAuthBack').addEventListener('click',()=>{$('tpAuthCodeStep').classList.add('tp-auth-hidden');$('tpAuthEmailStep').classList.remove('tp-auth-hidden');authMsg('');$('tpAuthEmail').focus();});
+ $('tpAuthResend').addEventListener('click',()=>{if(!resendLeft)sendAuthCode(true);});
+ const auth=async()=>openAuth();
  async function setupProfile(){
   if(!me)return;
   const {data}=await client.from('tp_profiles').select('username,display_name').eq('id',me.id).maybeSingle();
@@ -205,15 +277,15 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  document.querySelector('.sidehead').appendChild(newChat);
  const sign=document.createElement('button');sign.className='iconbtn';sign.textContent='Sign in';
  sign.style.cssText='position:fixed;right:18px;top:18px;z-index:16;width:auto;padding:0 12px';
- sign.addEventListener('click',async()=>{if(me){await client.auth.signOut();me=null;activeConversationId=null;note('Signed out · Guest preview');}else await auth();});
+ sign.addEventListener('click',async()=>{if(me){await client.auth.signOut();me=null;window.tpMe=null;activeConversationId=null;sign.textContent='Sign in';note('Signed out · Guest preview');}else await auth();});
  document.body.appendChild(sign);
  client.auth.getSession().then(async({data})=>{
   me=data.session?.user||null;
-  if(me){note('Signed in · '+(me.email||'Member'));await setupProfile();await loadMyChats();}
+  if(me){sign.textContent='Account · Sign out';window.tpMe=me;note('Signed in · '+(me.email||'Member'));await setupProfile();await loadMyChats();}
  });
  client.auth.onAuthStateChange(async(_event,session)=>{
   me=session?.user||null;
-  if(!me){activeConversationId=null;note('Signed out · Guest preview');}
+  if(!me){window.tpMe=null;sign.textContent='Sign in';activeConversationId=null;note('Signed out · Guest preview');}else{window.tpMe=me;sign.textContent='Account · Sign out';}
  });
 })();
 </script>
