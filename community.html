@@ -22,7 +22,7 @@
 </aside>
 <aside class="sidebar">
 <div class="mobiletop"><div class="brand">TELEGRAM <b>PRO</b></div><button class="iconbtn">＋</button></div>
-<div class="sidehead"><div class="brand">BLACKBULL <b>COMMUNITY</b></div><div class="subbrand">MESSAGING · COMMUNITIES · CONNECTION</div><div class="search">⌕ <input id="search" placeholder="Search chats, people, channels"></div></div>
+<div class="sidehead"><div class="brand">TELEGRAM <b>PRO</b></div><div class="subbrand">MESSAGING · COMMUNITIES · CONNECTION</div><div class="search">⌕ <input id="search" placeholder="Search chats, people, channels"></div></div>
 <div class="stories">
 <div class="story"><div class="avatar">＋</div>Your story</div><div class="story"><div class="avatar blue">BB</div>BlackBull</div><div class="story"><div class="avatar purple">AR</div>Arham</div><div class="story"><div class="avatar green">SK</div>Sarah</div><div class="story"><div class="avatar gray">MK</div>Market</div>
 </div>
@@ -63,7 +63,10 @@ document.querySelectorAll('.item').forEach(item=>item.addEventListener('click',(
 document.getElementById('back').addEventListener('click',()=>app.classList.remove('chatopen'));
 document.getElementById('composer').addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('message'),v=input.value.trim();if(!v)return;const m=document.createElement('div');m.className='msg mine';const p=document.createElement('p');p.textContent=v;m.appendChild(p);const time=document.createElement('time');time.textContent='Just now · local preview';m.appendChild(time);document.getElementById('messages').appendChild(m);input.value='';document.getElementById('messages').scrollTop=999999;notify('Message added to this local preview only');});
 document.getElementById('search').addEventListener('input',e=>{const q=e.target.value.toLowerCase();document.querySelectorAll('.item').forEach(i=>i.style.display=i.dataset.name.toLowerCase().includes(q)?'flex':'none')});
-document.getElementById('attach').addEventListener('click',()=>notify('Media upload will be enabled when storage is connected.'));\ndocument.getElementById('emojiBtn').addEventListener('click',()=>{const p=document.getElementById('emojiPanel');p.style.display=p.style.display==='grid'?'none':'grid';});\ndocument.querySelectorAll('#emojiPanel button:not(.premiumEmoji)').forEach(b=>b.addEventListener('click',()=>{const i=document.getElementById('message');i.value+=b.textContent;i.focus();}));\ndocument.querySelectorAll('.premiumEmoji').forEach(b=>b.addEventListener('click',()=>notify('Premium animated emoji preview — original packs will be added after licensing/design.')));
+document.getElementById('attach').addEventListener('click',()=>notify('Media upload will be enabled when storage is connected.'));
+document.getElementById('emojiBtn').addEventListener('click',()=>{const p=document.getElementById('emojiPanel');p.style.display=p.style.display==='grid'?'none':'grid';});
+document.querySelectorAll('#emojiPanel button:not(.premiumEmoji)').forEach(b=>b.addEventListener('click',()=>{const i=document.getElementById('message');i.value+=b.textContent;i.focus();}));
+document.querySelectorAll('.premiumEmoji').forEach(b=>b.addEventListener('click',()=>notify('Premium animated emoji preview — original packs will be added after licensing/design.')));
 document.getElementById('premium').addEventListener('click',()=>notify('Premium plans will be configured before launch.'));
 document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>notify(b.title+' section preview')));
 </script>
