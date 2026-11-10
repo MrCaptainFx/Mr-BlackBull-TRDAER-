@@ -106,7 +106,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
 (function(){
  const SUPA_URL='https://yoawjkzayqvibqisceta.supabase.co';
  const SUPA_KEY='sb_publishable_E-I22Tl0LGGBTOFeGYOx-w_UyLSU4aM';
- const client=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+ const client=window.supabase.createClient(SUPA_URL,SUPA_KEY);window.tpClient=client;
  let me=null, activeConversationId=null, realtime=null;
  const $=id=>document.getElementById(id);
  const status=document.createElement('div');
@@ -125,7 +125,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   if(!token)return;
   const result=await client.auth.verifyOtp({email:email.trim(),token:token.trim(),type:'email'});
   if(result.error){note('Verification failed: '+result.error.message);return;}
-  me=result.data.user; note('Signed in · '+(me.email||'Telegram Pro member')); await setupProfile(); await loadMyChats();
+  me=result.data.user; window.tpMe=me; note('Signed in · '+(me.email||'Telegram Pro member')); await setupProfile(); await loadMyChats();
  };
  async function setupProfile(){
   if(!me)return;
@@ -149,7 +149,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   box.scrollTop=box.scrollHeight;
  }
  async function openConversation(id,title){
-  activeConversationId=id;$('chatname').textContent=title||'Private conversation';
+  activeConversationId=id;window.tpActiveConversationId=id;$('chatname').textContent=title||'Private conversation';
   $('chatstatus').textContent='Secure member conversation';
   const {data,error}=await client.from('tp_messages').select('id,body,sender_id,created_at').eq('conversation_id',id).order('created_at',{ascending:true}).limit(100);
   if(error){note('Could not load messages: '+error.message);return;}
@@ -214,6 +214,48 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  client.auth.onAuthStateChange(async(_event,session)=>{
   me=session?.user||null;
   if(!me){activeConversationId=null;note('Signed out · Guest preview');}
+ });
+})();
+</script>
+
+
+<script>
+(()=>{
+ const client=window.tpClient;if(!client)return;
+ const state=()=>window.tpMe;
+ const addBtn=document.createElement('button');addBtn.className='goldbtn';addBtn.textContent='＋ Create group / channel';addBtn.style.cssText='margin:0 14px 8px;width:calc(100% - 28px);background:#26364a;color:#e9d7a8;border:1px solid #45566a';
+ document.querySelector('.sidehead').appendChild(addBtn);
+ addBtn.onclick=async()=>{
+  const user=state();if(!user){alert('Sign in first using the Sign in button.');return;}
+  const kind=prompt('Type group or channel:','group');if(!['group','channel'].includes((kind||'').toLowerCase()))return;
+  const title=prompt('Name your '+kind+':');if(!title?.trim())return;
+  const {data,error}=await client.from('tp_conversations').insert({kind:kind.toLowerCase(),title:title.trim(),created_by:user.id,is_public:false}).select('id').single();
+  if(error){alert('Could not create space: '+error.message);return;}
+  window.tpActiveConversationId=data.id;
+  document.getElementById('chatname').textContent=title.trim();
+  document.getElementById('chatstatus').textContent='Private '+kind+' · owner';
+  const invite=prompt('Invite a member by username now? (Leave blank to do this later):');
+  if(invite?.trim()){
+   const result=await client.rpc('tp_add_conversation_member',{p_conversation_id:data.id,p_username:invite.trim()});
+   if(result.error)alert('Space created. Invite failed: '+result.error.message);
+  }
+  alert('Space created. You are the owner. Add more members from the space menu once member tools are enabled.');
+ };
+ const more=document.querySelector('.headactions button[title="More"]');
+ if(more)more.addEventListener('click',()=>{
+  const invite=confirm('Invite a member to this group/channel?');
+  if(!invite)return;
+  const user=state(),id=window.tpActiveConversationId;if(!user||!id){alert('Sign in and open one of your spaces first.');return;}
+  const username=prompt('Member username:');if(!username?.trim())return;
+  client.rpc('tp_add_conversation_member',{p_conversation_id:id,p_username:username.trim()}).then(({error})=>alert(error?'Invite failed: '+error.message:'Member added successfully.'));
+ });
+ const report=document.getElementById('reportSpace');
+ if(report)report.addEventListener('click',async()=>{
+  const user=state();if(!user){document.getElementById('safetyStatus').textContent='Sign in to submit a report.';return;}
+  const reason=prompt('Briefly describe the concern (at least 3 characters):');if(!reason?.trim())return;
+  const id=window.tpActiveConversationId||null;
+  const {error}=await client.from('tp_reports').insert({reporter_id:user.id,conversation_id:id,reason:reason.trim()});
+  document.getElementById('safetyStatus').textContent=error?'Report could not be submitted: '+error.message:'Report submitted to the moderation queue.';
  });
 })();
 </script>
