@@ -219,9 +219,28 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   const actions=document.createElement('div');actions.className='tp-msg-actions';
   ['👍','❤️','😂'].forEach(emoji=>{const b=document.createElement('button');b.type='button';b.textContent=emoji;b.title='React '+emoji;b.addEventListener('click',()=>toggleReaction(row.id,emoji,b));actions.appendChild(b);});
   const save=document.createElement('button');save.type='button';save.textContent='☆ Save';save.title='Save message';save.addEventListener('click',()=>saveMessage(row.id,save));actions.appendChild(save);
+  if(me&&row.sender_id===me.id){
+   const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';edit.addEventListener('click',()=>editMessage(row.id,p));actions.appendChild(edit);
+   const del=document.createElement('button');del.type='button';del.textContent='Delete';del.addEventListener('click',()=>deleteMessage(row.id,el));actions.appendChild(del);
+  }
   el.appendChild(actions);
   const time=document.createElement('time');time.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(time);
   return el;
+ }
+ async function editMessage(messageId,paragraph){
+  if(!me)return;
+  const next=prompt('Edit your message:',paragraph.textContent);
+  if(next===null)return;
+  const body=next.trim();if(!body){note('Message cannot be empty.');return;}
+  const {error}=await client.from('tp_messages').update({body}).eq('id',messageId).eq('sender_id',me.id);
+  if(error){note('Edit failed: '+error.message);return;}
+  paragraph.textContent=body;note('Message updated.');
+ }
+ async function deleteMessage(messageId,element){
+  if(!me||!confirm('Delete this message?'))return;
+  const {error}=await client.from('tp_messages').delete().eq('id',messageId).eq('sender_id',me.id);
+  if(error){note('Delete failed: '+error.message);return;}
+  element.remove();note('Message deleted.');
  }
  async function toggleReaction(messageId,emoji,button){
   if(!me){note('Sign in to react to messages.');return;}
@@ -259,7 +278,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   drawMessages(data||[]);
   await markMessagesRead(data||[]);
   if(realtime)await client.removeChannel(realtime);
-  realtime=client.channel('tp-chat-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'tp_messages',filter:'conversation_id=eq.'+id},payload=>{
+  realtime=client.channel('tp-chat-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'tp_messages',filter:'conversation_id=eq.'+id},async payload=>{
    const rows=[...document.querySelectorAll('#messages .msg')];
    const row=payload.new;
    if(rows.some(el=>el.dataset.mid===row.id))return;
