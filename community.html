@@ -34,6 +34,8 @@
 .tp-auth-hidden{display:none!important}
 @media(max-width:480px){.tp-auth-card{padding:22px;border-radius:20px}.tp-auth-title{font-size:21px}}
 
+
+.tp-msg-actions{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 2px}.tp-msg-actions button{border:1px solid #34465b;background:#182536;color:#cbd5e1;border-radius:14px;padding:3px 8px;font-size:12px;cursor:pointer}.tp-msg-actions button.active{border-color:#d7b56d;color:#f2d89a;background:#3b3223}.tp-msg-actions button:disabled{opacity:.8}
 </style>
 </head>
 <body>
@@ -211,13 +213,42 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
    if(error)note('Profile setup needs attention: '+error.message);
   }
  }
+ function makeMessage(row){
+  const el=document.createElement('div');el.dataset.mid=row.id;el.className='msg'+(row.sender_id===me?.id?' mine':'');
+  const p=document.createElement('p');p.textContent=row.body;el.appendChild(p);
+  const actions=document.createElement('div');actions.className='tp-msg-actions';
+  ['👍','❤️','😂'].forEach(emoji=>{const b=document.createElement('button');b.type='button';b.textContent=emoji;b.title='React '+emoji;b.addEventListener('click',()=>toggleReaction(row.id,emoji,b));actions.appendChild(b);});
+  const save=document.createElement('button');save.type='button';save.textContent='☆ Save';save.title='Save message';save.addEventListener('click',()=>saveMessage(row.id,save));actions.appendChild(save);
+  el.appendChild(actions);
+  const time=document.createElement('time');time.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(time);
+  return el;
+ }
+ async function toggleReaction(messageId,emoji,button){
+  if(!me){note('Sign in to react to messages.');return;}
+  const {data,error}=await client.from('tp_message_reactions').select('message_id').eq('message_id',messageId).eq('user_id',me.id).eq('reaction',emoji).maybeSingle();
+  if(error){note('Reaction unavailable: '+error.message);return;}
+  const result=data
+   ? await client.from('tp_message_reactions').delete().eq('message_id',messageId).eq('user_id',me.id).eq('reaction',emoji)
+   : await client.from('tp_message_reactions').insert({message_id:messageId,user_id:me.id,reaction:emoji});
+  if(result.error){note('Reaction not saved: '+result.error.message);return;}
+  button.classList.toggle('active',!data);
+ }
+ async function saveMessage(messageId,button){
+  if(!me){note('Sign in to save messages.');return;}
+  const {error}=await client.from('tp_saved_messages').insert({user_id:me.id,message_id:messageId});
+  if(error&&error.code!=='23505'){note('Could not save message: '+error.message);return;}
+  button.textContent='★ Saved';button.disabled=true;note('Saved to your Saved Messages.');
+ }
+ async function markMessagesRead(rows){
+  if(!me||!rows.length)return;
+  const incoming=rows.filter(r=>r.sender_id!==me.id).map(r=>({message_id:r.id,user_id:me.id}));
+  if(!incoming.length)return;
+  const {error}=await client.from('tp_message_reads').upsert(incoming,{onConflict:'message_id,user_id',ignoreDuplicates:true});
+  if(error)note('Read receipt could not be updated: '+error.message);
+ }
  function drawMessages(rows){
   const box=$('messages');box.innerHTML='<div class="day">LIVE CONVERSATION</div>';
-  rows.forEach(row=>{
-   const el=document.createElement('div');el.dataset.mid=row.id;el.className='msg'+(row.sender_id===me?.id?' mine':'');
-   const p=document.createElement('p');p.textContent=row.body;el.appendChild(p);
-   const time=document.createElement('time');time.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(time);box.appendChild(el);
-  });
+  rows.forEach(row=>box.appendChild(makeMessage(row)));
   box.scrollTop=box.scrollHeight;
  }
  async function openConversation(id,title){
@@ -226,15 +257,15 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   const {data,error}=await client.from('tp_messages').select('id,body,sender_id,created_at').eq('conversation_id',id).order('created_at',{ascending:true}).limit(100);
   if(error){note('Could not load messages: '+error.message);return;}
   drawMessages(data||[]);
+  await markMessagesRead(data||[]);
   if(realtime)await client.removeChannel(realtime);
   realtime=client.channel('tp-chat-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'tp_messages',filter:'conversation_id=eq.'+id},payload=>{
    const rows=[...document.querySelectorAll('#messages .msg')];
    const row=payload.new;
    if(rows.some(el=>el.dataset.mid===row.id))return;
-   const el=document.createElement('div');el.dataset.mid=row.id;el.className='msg'+(row.sender_id===me.id?' mine':'');
-   const p=document.createElement('p');p.textContent=row.body;el.appendChild(p);
-   const t=document.createElement('time');t.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(t);
-   $('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;
+   $('messages').appendChild(makeMessage(row));
+   if(row.sender_id!==me.id)await markMessagesRead([row]);
+   $('messages').scrollTop=$('messages').scrollHeight;
   }).subscribe();
  }
  window.tpOpenConversation=openConversation;
@@ -266,6 +297,18 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   const {error}=await client.from('tp_messages').insert({conversation_id:activeConversationId,sender_id:me.id,body});
   if(error){input.value=body;note('Message not sent: '+error.message);}else note('Message sent securely');
  },true);
+ const savedBtn=document.createElement('button');savedBtn.className='goldbtn';savedBtn.textContent='☆ Saved Messages';savedBtn.style.cssText='margin:0 14px 8px;width:calc(100% - 28px);background:#26364a;color:#e9d7a8;border:1px solid #45566a';
+ savedBtn.addEventListener('click',async()=>{
+  if(!me){await auth();return;}
+  const {data,error}=await client.from('tp_saved_messages').select('message_id,saved_at,tp_messages(id,body,sender_id,created_at,conversation_id)').eq('user_id',me.id).order('saved_at',{ascending:false}).limit(100);
+  if(error){note('Saved Messages: '+error.message);return;}
+  activeConversationId=null;window.tpActiveConversationId=null;$('chatname').textContent='Saved Messages';$('chatstatus').textContent='Only visible to you';
+  const box=$('messages');box.innerHTML='<div class="day">YOUR SAVED MESSAGES</div>';
+  (data||[]).forEach(item=>{if(item.tp_messages)box.appendChild(makeMessage(item.tp_messages));});
+  if(!(data||[]).length)box.insertAdjacentHTML('beforeend','<div class="day">No saved messages yet.</div>');
+  if(realtime){await client.removeChannel(realtime);realtime=null;}
+ });
+ document.querySelector('.sidehead').appendChild(savedBtn);
  const newChat=document.createElement('button');newChat.className='goldbtn';newChat.textContent='＋ New private chat';
  newChat.style.cssText='margin:0 14px 12px;width:calc(100% - 28px)';
  newChat.addEventListener('click',async()=>{
