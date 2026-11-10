@@ -142,7 +142,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  function drawMessages(rows){
   const box=$('messages');box.innerHTML='<div class="day">LIVE CONVERSATION</div>';
   rows.forEach(row=>{
-   const el=document.createElement('div');el.className='msg'+(row.sender_id===me?.id?' mine':'');
+   const el=document.createElement('div');el.dataset.mid=row.id;el.className='msg'+(row.sender_id===me?.id?' mine':'');
    const p=document.createElement('p');p.textContent=row.body;el.appendChild(p);
    const time=document.createElement('time');time.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(time);box.appendChild(el);
   });
@@ -159,7 +159,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
    const rows=[...document.querySelectorAll('#messages .msg')];
    const row=payload.new;
    if(rows.some(el=>el.dataset.mid===row.id))return;
-   const el=document.createElement('div');el.className='msg'+(row.sender_id===me.id?' mine':'');el.dataset.mid=row.id;
+   const el=document.createElement('div');el.dataset.mid=row.id;el.className='msg'+(row.sender_id===me.id?' mine':'');
    const p=document.createElement('p');p.textContent=row.body;el.appendChild(p);
    const t=document.createElement('time');t.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(t);
    $('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;
