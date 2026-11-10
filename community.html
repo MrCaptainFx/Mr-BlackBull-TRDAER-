@@ -340,9 +340,22 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   me=data.session?.user||null;
   if(me){sign.textContent='Account · Sign out';window.tpMe=me;note('Signed in · '+(me.email||'Member'));await setupProfile();await loadMyChats();}
  });
- client.auth.onAuthStateChange(async(_event,session)=>{
+ client.auth.onAuthStateChange(async(event,session)=>{
   me=session?.user||null;
-  if(!me){window.tpMe=null;sign.textContent='Sign in';activeConversationId=null;note('Signed out · Guest preview');}else{window.tpMe=me;sign.textContent='Account · Sign out';}
+  if(!me){
+   window.tpMe=null;sign.textContent='Sign in';activeConversationId=null;window.tpActiveConversationId=null;
+   if(realtime){await client.removeChannel(realtime);realtime=null;}
+   document.querySelectorAll('#chatlist [data-live="1"]').forEach(n=>n.remove());
+   $('messages').innerHTML='<div class="day">Sign in to open your conversations.</div>';
+   $('chatname').textContent='Choose a conversation';$('chatstatus').textContent='Guest preview';
+   note('Signed out · Guest preview');
+  }else{
+   window.tpMe=me;sign.textContent='Account · Sign out';
+   if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'){
+    await setupProfile();await loadMyChats();
+    note('Signed in · conversations synced');
+   }
+  }
  });
 })();
 </script>
