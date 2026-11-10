@@ -112,7 +112,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   <button class="iconbtn tp-auth-close" id="tpAuthClose" type="button" aria-label="Close">✕</button>
   <div class="tp-auth-mark">✦</div>
   <h2 class="tp-auth-title" id="tpAuthTitle">Welcome to Telegram Pro</h2>
-  <p class="tp-auth-sub" id="tpAuthSubtitle">Sign in or create your account securely with a one-time email code.</p>
+  <p class="tp-auth-sub" id="tpAuthSubtitle">Sign in or create your account securely with an email link.</p>
   <div class="tp-auth-tabs" id="tpAuthTabs"><button type="button" class="active" data-mode="signin">Log in</button><button type="button" data-mode="signup">Sign up</button></div>
   <div id="tpAuthEmailStep">
    <label class="tp-auth-label" for="tpAuthEmail">Email address</label>
@@ -120,10 +120,9 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
    <button class="tp-auth-primary" id="tpAuthSend" type="button">Continue with email</button>
   </div>
   <div id="tpAuthCodeStep" class="tp-auth-hidden">
-   <label class="tp-auth-label" for="tpAuthCode">6-digit verification code</label>
-   <input class="tp-auth-input tp-auth-code" id="tpAuthCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
-   <button class="tp-auth-primary" id="tpAuthVerify" type="button">Verify & continue</button>
-   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><button class="tp-auth-secondary" id="tpAuthBack" type="button">← Change email</button><button class="tp-auth-secondary" id="tpAuthResend" type="button" disabled>Resend in 60s</button></div>
+   <div class="tp-auth-label">Check your email</div>
+   <p style="color:#aab5c6;line-height:1.6;font-size:13px">We sent you a secure sign-in link. Open that email on this device and tap <b>Sign in</b>. This page will complete your login automatically.</p>
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><button class="tp-auth-secondary" id="tpAuthBack" type="button">← Change email</button><button class="tp-auth-secondary" id="tpAuthResend" type="button" disabled>Resend link in 60s</button></div>
   </div>
   <div class="tp-auth-msg" id="tpAuthMessage" role="status" aria-live="polite"></div>
   <div class="tp-auth-foot">By continuing, you agree to use the community respectfully. Never share your verification code with anyone.</div>
@@ -150,35 +149,24 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  const authMsg=t=>{authMessage.textContent=t;note(t);};
  const openAuth=()=>{authModal.classList.add('open');authModal.setAttribute('aria-hidden','false');$('tpAuthEmail').focus();};
  const closeAuth=()=>{authModal.classList.remove('open');authModal.setAttribute('aria-hidden','true');};
- function setAuthMode(mode){authMode=mode;$('tpAuthTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$('tpAuthTitle').textContent=mode==='signup'?'Create your account':'Welcome back';$('tpAuthSubtitle').textContent=mode==='signup'?'Join Telegram Pro with a secure one-time email code.':'Log in securely with a one-time email code.';authMsg('');}
- function startResendTimer(){clearInterval(resendTimer);resendLeft=60;$('tpAuthResend').disabled=true;$('tpAuthResend').textContent='Resend in 60s';resendTimer=setInterval(()=>{resendLeft--;if(resendLeft<=0){clearInterval(resendTimer);$('tpAuthResend').disabled=false;$('tpAuthResend').textContent='Resend code';}else $('tpAuthResend').textContent='Resend in '+resendLeft+'s';},1000);}
+ function setAuthMode(mode){authMode=mode;$('tpAuthTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$('tpAuthTitle').textContent=mode==='signup'?'Create your account':'Welcome back';$('tpAuthSubtitle').textContent=mode==='signup'?'Join Telegram Pro with a secure email sign-in link.':'Log in securely with a one-time email link.';authMsg('');}
+ function startResendTimer(){clearInterval(resendTimer);resendLeft=60;$('tpAuthResend').disabled=true;$('tpAuthResend').textContent='Resend in 60s';resendTimer=setInterval(()=>{resendLeft--;if(resendLeft<=0){clearInterval(resendTimer);$('tpAuthResend').disabled=false;$('tpAuthResend').textContent='Resend code';}else $('tpAuthResend').textContent='Resend link in '+resendLeft+'s';},1000);}
  async function sendAuthCode(isResend=false){
   const email=(authEmail||$('tpAuthEmail').value).trim().toLowerCase();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){authMsg('Please enter a valid email address.');return;}
-  authEmail=email;$('tpAuthSend').disabled=true;$('tpAuthSend').textContent='Sending code…';
-  const {error}=await client.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
+  authEmail=email;$('tpAuthSend').disabled=true;$('tpAuthSend').textContent='Sending link…';
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await client.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:redirectTo}});
   $('tpAuthSend').disabled=false;$('tpAuthSend').textContent='Continue with email';
-  if(error){authMsg('Could not send code: '+error.message+' · Check spam or wait before retrying.');return;}
-  $('tpAuthEmailStep').classList.add('tp-auth-hidden');$('tpAuthCodeStep').classList.remove('tp-auth-hidden');$('tpAuthCode').focus();
-  authMsg('If email delivery is enabled, a verification email has been requested for '+email+'. Check Inbox, Spam and Promotions.');
+  if(error){authMsg('Could not send sign-in link: '+error.message+' · Check the allowed redirect URL and try again.');return;}
+  $('tpAuthEmailStep').classList.add('tp-auth-hidden');$('tpAuthCodeStep').classList.remove('tp-auth-hidden');
+  authMsg('Sign-in link requested for '+email+'. Open the email and tap Sign in. Check Inbox, Spam and Promotions.');
   startResendTimer();
- }
- async function verifyAuthCode(){
-  const token=$('tpAuthCode').value.replace(/\\D/g,'');
-  if(token.length!==6){authMsg('Enter the complete 6-digit code.');return;}
-  $('tpAuthVerify').disabled=true;$('tpAuthVerify').textContent='Verifying…';
-  const result=await client.auth.verifyOtp({email:authEmail,token,type:'email'});
-  $('tpAuthVerify').disabled=false;$('tpAuthVerify').textContent='Verify & continue';
-  if(result.error){authMsg('Verification failed: '+result.error.message);return;}
-  me=result.data.user;window.tpMe=me;closeAuth();note('Signed in · '+(me.email||'Telegram Pro member'));await setupProfile();await loadMyChats();
  }
  $('tpAuthClose').addEventListener('click',closeAuth);
  authModal.addEventListener('click',e=>{if(e.target===authModal)closeAuth();});
  $('tpAuthTabs').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setAuthMode(b.dataset.mode)));
  $('tpAuthSend').addEventListener('click',()=>sendAuthCode(false));
- $('tpAuthVerify').addEventListener('click',verifyAuthCode);
- $('tpAuthCode').addEventListener('input',()=>{$('tpAuthCode').value=$('tpAuthCode').value.replace(/\\D/g,'').slice(0,6);});
- $('tpAuthCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyAuthCode();});
  $('tpAuthEmail').addEventListener('keydown',e=>{if(e.key==='Enter')sendAuthCode(false);});
  $('tpAuthBack').addEventListener('click',()=>{$('tpAuthCodeStep').classList.add('tp-auth-hidden');$('tpAuthEmailStep').classList.remove('tp-auth-hidden');authMsg('');$('tpAuthEmail').focus();});
  $('tpAuthResend').addEventListener('click',()=>{if(!resendLeft)sendAuthCode(true);});
