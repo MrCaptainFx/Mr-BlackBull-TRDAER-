@@ -272,7 +272,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   }).subscribe();
  }
  window.tpOpenConversation=openConversation;
- async async function loadMyChats(){
+ async function loadMyChats(){
   if(!me)return;
   const {data,error}=await client.from('tp_conversation_members').select('conversation_id,tp_conversations(id,kind,title,created_at)').eq('user_id',me.id);
   if(error){note('Chat list: '+error.message);return;}
