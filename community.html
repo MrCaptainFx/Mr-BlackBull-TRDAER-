@@ -99,4 +99,123 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  });
 })();
 </script>
+
+<!-- Telegram Pro backend client: email OTP is available; SMS needs a configured provider. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+ const SUPA_URL='https://yoawjkzayqvibqisceta.supabase.co';
+ const SUPA_KEY='sb_publishable_E-I22Tl0LGGBTOFeGYOx-w_UyLSU4aM';
+ const client=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+ let me=null, activeConversationId=null, realtime=null;
+ const $=id=>document.getElementById(id);
+ const status=document.createElement('div');
+ status.id='tpLiveStatus';
+ status.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:15;background:#172638;border:1px solid #455a70;color:#e9d7a8;padding:7px 12px;border-radius:10px;font-size:11px;max-width:90vw;text-align:center';
+ status.textContent='Telegram Pro · Guest preview';
+ document.body.appendChild(status);
+ const note=t=>{status.textContent=t;};
+ const auth=async()=>{
+  const email=prompt('Enter your email address to receive a sign-in code:');
+  if(!email)return;
+  const {error}=await client.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:true}});
+  note(error?'Sign-in request failed: '+error.message:'Verification code sent to your email. Verify it using the prompt on return.');
+  if(error)return;
+  const token=prompt('Enter the 6-digit code from your email:');
+  if(!token)return;
+  const result=await client.auth.verifyOtp({email:email.trim(),token:token.trim(),type:'email'});
+  if(result.error){note('Verification failed: '+result.error.message);return;}
+  me=result.data.user; note('Signed in · '+(me.email||'Telegram Pro member')); await setupProfile(); await loadMyChats();
+ };
+ async function setupProfile(){
+  if(!me)return;
+  const {data}=await client.from('tp_profiles').select('username,display_name').eq('id',me.id).maybeSingle();
+  if(!data?.username){
+   const proposed=(me.email||'member').split('@')[0].replace(/[^A-Za-z0-9_]/g,'').slice(0,20)||'member';
+   const username=prompt('Choose a public username (3–24 letters, numbers or underscores):',proposed);
+   if(username){
+    const {error}=await client.from('tp_profiles').update({username:username,display_name:username}).eq('id',me.id);
+    if(error)note('Profile setup: '+error.message);
+   }
+  }
+ }
+ function drawMessages(rows){
+  const box=$('messages');box.innerHTML='<div class="day">LIVE CONVERSATION</div>';
+  rows.forEach(row=>{
+   const el=document.createElement('div');el.className='msg'+(row.sender_id===me?.id?' mine':'');
+   const p=document.createElement('p');p.textContent=row.body;el.appendChild(p);
+   const time=document.createElement('time');time.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(time);box.appendChild(el);
+  });
+  box.scrollTop=box.scrollHeight;
+ }
+ async function openConversation(id,title){
+  activeConversationId=id;$('chatname').textContent=title||'Private conversation';
+  $('chatstatus').textContent='Secure member conversation';
+  const {data,error}=await client.from('tp_messages').select('id,body,sender_id,created_at').eq('conversation_id',id).order('created_at',{ascending:true}).limit(100);
+  if(error){note('Could not load messages: '+error.message);return;}
+  drawMessages(data||[]);
+  if(realtime)await client.removeChannel(realtime);
+  realtime=client.channel('tp-chat-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'tp_messages',filter:'conversation_id=eq.'+id},payload=>{
+   const rows=[...document.querySelectorAll('#messages .msg')];
+   const row=payload.new;
+   if(rows.some(el=>el.dataset.mid===row.id))return;
+   const el=document.createElement('div');el.className='msg'+(row.sender_id===me.id?' mine':'');el.dataset.mid=row.id;
+   const p=document.createElement('p');p.textContent=row.body;el.appendChild(p);
+   const t=document.createElement('time');t.textContent=new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.appendChild(t);
+   $('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;
+  }).subscribe();
+ }
+ async function loadMyChats(){
+  if(!me)return;
+  const {data,error}=await client.from('tp_conversation_members').select('conversation_id,tp_conversations(id,kind,title,created_at)').eq('user_id',me.id);
+  if(error){note('Chat list: '+error.message);return;}
+  const list=$('chatlist');
+  list.querySelectorAll('[data-live="1"]').forEach(n=>n.remove());
+  (data||[]).forEach(row=>{
+   const c=row.tp_conversations;if(!c)return;
+   const el=document.createElement('div');el.className='item';el.dataset.live='1';el.dataset.name=c.title||'Private chat';
+   const av=document.createElement('div');av.className='avatar blue';av.textContent=(c.title||'DM').slice(0,2).toUpperCase();
+   const main=document.createElement('div');main.className='itemmain';
+   const top=document.createElement('div');top.className='itemtop';top.textContent=el.dataset.name;
+   const preview=document.createElement('div');preview.className='preview';preview.textContent=c.kind==='direct'?'Private conversation':'Community space';
+   main.append(top,preview);el.append(av,main);
+   el.addEventListener('click',()=>openConversation(c.id,el.dataset.name));
+   list.prepend(el);
+  });
+  note('Connected · '+(data||[]).length+' conversations loaded');
+ }
+ const form=$('composer');
+ form.addEventListener('submit',async function(e){
+  if(!me||!activeConversationId)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  const input=$('message'),body=input.value.trim();if(!body)return;
+  input.value='';
+  const {error}=await client.from('tp_messages').insert({conversation_id:activeConversationId,sender_id:me.id,body});
+  if(error){input.value=body;note('Message not sent: '+error.message);}else note('Message sent securely');
+ },true);
+ const newChat=document.createElement('button');newChat.className='goldbtn';newChat.textContent='＋ New private chat';
+ newChat.style.cssText='margin:0 14px 12px;width:calc(100% - 28px)';
+ newChat.addEventListener('click',async()=>{
+  if(!me){await auth();return;}
+  const username=prompt('Enter the member username:');if(!username)return;
+  const {data,error}=await client.rpc('tp_create_direct_conversation',{p_username:username.trim()});
+  if(error){note('Could not start chat: '+error.message);return;}
+  await loadMyChats();await openConversation(data,username.trim());
+ });
+ document.querySelector('.sidehead').appendChild(newChat);
+ const sign=document.createElement('button');sign.className='iconbtn';sign.textContent='Sign in';
+ sign.style.cssText='position:fixed;right:18px;top:18px;z-index:16;width:auto;padding:0 12px';
+ sign.addEventListener('click',async()=>{if(me){await client.auth.signOut();me=null;activeConversationId=null;note('Signed out · Guest preview');}else await auth();});
+ document.body.appendChild(sign);
+ client.auth.getSession().then(async({data})=>{
+  me=data.session?.user||null;
+  if(me){note('Signed in · '+(me.email||'Member'));await setupProfile();await loadMyChats();}
+ });
+ client.auth.onAuthStateChange(async(_event,session)=>{
+  me=session?.user||null;
+  if(!me){activeConversationId=null;note('Signed out · Guest preview');}
+ });
+})();
+</script>
+
 </body></html>
