@@ -201,14 +201,14 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  const auth=async()=>openAuth();
  async function setupProfile(){
   if(!me)return;
-  const {data}=await client.from('tp_profiles').select('username,display_name').eq('id',me.id).maybeSingle();
+  const {data,error:readError}=await client.from('tp_profiles').select('username,display_name').eq('id',me.id).maybeSingle();
+  if(readError){note('Profile could not be loaded: '+readError.message);return;}
   if(!data?.username){
-   const proposed=(me.email||'member').split('@')[0].replace(/[^A-Za-z0-9_]/g,'').slice(0,20)||'member';
-   const username=prompt('Choose a public username (3–24 letters, numbers or underscores):',proposed);
-   if(username){
-    const {error}=await client.from('tp_profiles').update({username:username,display_name:username}).eq('id',me.id);
-    if(error)note('Profile setup: '+error.message);
-   }
+   const base=(me.email||'member').split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,16)||'member';
+   const username=base+'_'+me.id.slice(-5);
+   const displayName=(me.email||'Telegram Pro member').split('@')[0].slice(0,40);
+   const {error}=await client.from('tp_profiles').update({username,display_name:displayName}).eq('id',me.id);
+   if(error)note('Profile setup needs attention: '+error.message);
   }
  }
  function drawMessages(rows){
