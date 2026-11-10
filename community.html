@@ -154,7 +154,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  function startResendTimer(){clearInterval(resendTimer);resendLeft=60;$('tpAuthResend').disabled=true;$('tpAuthResend').textContent='Resend in 60s';resendTimer=setInterval(()=>{resendLeft--;if(resendLeft<=0){clearInterval(resendTimer);$('tpAuthResend').disabled=false;$('tpAuthResend').textContent='Resend code';}else $('tpAuthResend').textContent='Resend in '+resendLeft+'s';},1000);}
  async function sendAuthCode(isResend=false){
   const email=(authEmail||$('tpAuthEmail').value).trim().toLowerCase();
-  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){authMsg('Please enter a valid email address.');return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){authMsg('Please enter a valid email address.');return;}
   authEmail=email;$('tpAuthSend').disabled=true;$('tpAuthSend').textContent='Sending code…';
   const {error}=await client.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
   $('tpAuthSend').disabled=false;$('tpAuthSend').textContent='Continue with email';
