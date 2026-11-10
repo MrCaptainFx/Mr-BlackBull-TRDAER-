@@ -98,9 +98,10 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
 <div id="safetyModal" style="display:none;position:fixed;inset:0;z-index:20;background:#050912eF;place-items:center;padding:18px">
  <section style="width:min(420px,100%);background:#111b29;border:1px solid #3a4657;border-radius:18px;padding:22px">
   <div style="display:flex;justify-content:space-between;align-items:center"><b style="color:var(--gold2)">Privacy & Safety</b><button id="safetyClose" class="iconbtn" type="button">✕</button></div>
-  <p style="color:var(--muted);font-size:12px">Safety tools are preview-only until accounts and moderation services are connected.</p>
-  <button id="reportSpace" class="goldbtn" type="button" style="margin:7px 0">Report this space</button>
-  <button id="blockSpace" class="goldbtn" type="button" style="margin:7px 0;background:#27384c;color:#e6edf5">Hide this space in my preview</button>
+  <p style="color:var(--muted);font-size:12px">Account safety controls. Blocking prevents future direct messages from that member.</p>
+  <button id="reportSpace" class="goldbtn" type="button" style="margin:7px 0">Report current conversation</button>
+  <button id="blockMember" class="goldbtn" type="button" style="margin:7px 0;background:#27384c;color:#e6edf5">Block member by username</button>
+  <button id="unblockMember" class="goldbtn" type="button" style="margin:7px 0;background:#27384c;color:#e6edf5">Unblock member by username</button>
   <div id="safetyStatus" style="font-size:11px;color:var(--gold2);margin-top:12px" role="status"></div>
  </section>
 </div>
@@ -113,14 +114,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
  if(more)more.addEventListener('click',()=>{modal.style.display='grid';status.textContent='';});
  document.getElementById('safetyClose').addEventListener('click',()=>modal.style.display='none');
  modal.addEventListener('click',e=>{if(e.target===modal)modal.style.display='none';});
- document.getElementById('reportSpace').addEventListener('click',()=>{status.textContent='Report flow is designed; authenticated report submission will be enabled with the moderation backend.';});
- document.getElementById('blockSpace').addEventListener('click',()=>{
-  const active=document.querySelector('.item.active');
-  if(active){active.style.display='none';active.classList.remove('active');}
-  status.textContent='This space is hidden in this browser preview only. Server-side blocking will require a signed-in account.';
-  document.getElementById('chatname').textContent='Choose a conversation';
-  document.getElementById('chatstatus').textContent='Space hidden in local preview';
- });
+ // Authenticated report/block actions are wired in the backend client script below.
 })();
 </script>
 
@@ -390,6 +384,35 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   const id=window.tpActiveConversationId||null;
   const {error}=await client.from('tp_reports').insert({reporter_id:user.id,conversation_id:id,reason:reason.trim()});
   document.getElementById('safetyStatus').textContent=error?'Report could not be submitted: '+error.message:'Report submitted to the moderation queue.';
+ });
+ const safetyStatus=document.getElementById('safetyStatus');
+ const resolveMember=async(username)=>{
+  const {data,error}=await client.from('tp_profiles').select('id,username,display_name').eq('username',username.trim().replace(/^@/,'')).maybeSingle();
+  if(error)throw error;
+  if(!data)throw new Error('Username not found.');
+  if(data.id===userId())throw new Error('You cannot block your own account.');
+  return data;
+ };
+ const userId=()=>state()?.id||null;
+ document.getElementById('blockMember').addEventListener('click',async()=>{
+  const user=state();if(!user){safetyStatus.textContent='Sign in first.';return;}
+  const username=prompt('Enter the exact username to block:');if(!username?.trim())return;
+  try{
+   const target=await resolveMember(username);
+   const {error}=await client.from('tp_user_blocks').insert({blocker_id:user.id,blocked_id:target.id});
+   if(error&&error.code!=='23505')throw error;
+   safetyStatus.textContent='@'+target.username+' is blocked for your account.';
+  }catch(e){safetyStatus.textContent='Block failed: '+e.message;}
+ });
+ document.getElementById('unblockMember').addEventListener('click',async()=>{
+  const user=state();if(!user){safetyStatus.textContent='Sign in first.';return;}
+  const username=prompt('Enter the exact username to unblock:');if(!username?.trim())return;
+  try{
+   const target=await resolveMember(username);
+   const {error}=await client.from('tp_user_blocks').delete().eq('blocker_id',user.id).eq('blocked_id',target.id);
+   if(error)throw error;
+   safetyStatus.textContent='@'+target.username+' unblocked (if previously blocked).';
+  }catch(e){safetyStatus.textContent='Unblock failed: '+e.message;}
  });
 })();
 </script>
