@@ -272,25 +272,70 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   }).subscribe();
  }
  window.tpOpenConversation=openConversation;
- async function loadMyChats(){
+ async async function loadMyChats(){
   if(!me)return;
   const {data,error}=await client.from('tp_conversation_members').select('conversation_id,tp_conversations(id,kind,title,created_at)').eq('user_id',me.id);
   if(error){note('Chat list: '+error.message);return;}
   const list=$('chatlist');
   list.querySelectorAll('[data-live="1"]').forEach(n=>n.remove());
-  (data||[]).forEach(row=>{
-   const c=row.tp_conversations;if(!c)return;
-   const el=document.createElement('div');el.className='item';el.dataset.live='1';el.dataset.name=c.title||'Private chat';
-   const av=document.createElement('div');av.className='avatar blue';av.textContent=(c.title||'DM').slice(0,2).toUpperCase();
+  const rows=data||[];
+  for(const row of rows){
+   const c=row.tp_conversations;if(!c)continue;
+   let label=c.title||'Private chat';
+   if(c.kind==='direct'){
+    const {data:members}=await client.from('tp_conversation_members').select('user_id,tp_profiles(username,display_name)').eq('conversation_id',c.id);
+    const other=(members||[]).find(x=>x.user_id!==me.id);
+    if(other?.tp_profiles)label=other.tp_profiles.display_name||('@'+other.tp_profiles.username);
+   }
+   const el=document.createElement('div');el.className='item';el.dataset.live='1';el.dataset.name=label;
+   const av=document.createElement('div');av.className='avatar blue';av.textContent=label.slice(0,2).toUpperCase();
    const main=document.createElement('div');main.className='itemmain';
-   const top=document.createElement('div');top.className='itemtop';top.textContent=el.dataset.name;
-   const preview=document.createElement('div');preview.className='preview';preview.textContent=c.kind==='direct'?'Private conversation':'Community space';
+   const top=document.createElement('div');top.className='itemtop';top.textContent=label;
+   const preview=document.createElement('div');preview.className='preview';preview.textContent=c.kind==='direct'?'Private conversation':(c.kind==='channel'?'Channel':'Group');
    main.append(top,preview);el.append(av,main);
-   el.addEventListener('click',()=>openConversation(c.id,el.dataset.name));
-   list.prepend(el);
-  });
-  note('Connected · '+(data||[]).length+' conversations loaded');
+   el.addEventListener('click',()=>{document.querySelectorAll('#chatlist .item').forEach(x=>x.classList.remove('active'));el.classList.add('active');if(innerWidth<=700)app.classList.add('chatopen');openConversation(c.id,label);});
+   list.append(el);
+  }
+  const empty=$('tpEmptyChats');if(empty)empty.style.display=rows.length?'none':'block';
+  note('Connected · '+rows.length+' conversations loaded');
  }
+ window.tpLoadMyChats=loadMyChats;
+ // Username directory search: only profiles visible under the public profile policy are searchable.
+ const searchInput=$('search');
+ let searchTimer=null,searchRequest=0;
+ searchInput.addEventListener('input',()=>{
+  clearTimeout(searchTimer);
+  const term=searchInput.value.trim().replace(/^@/,'');
+  searchTimer=setTimeout(async()=>{
+   const request=++searchRequest;
+   if(!me||term.length<2){listFilter(term);return;}
+   const {data,error}=await client.from('tp_profiles').select('id,username,display_name').ilike('username',term+'%').limit(12);
+   if(request!==searchRequest)return;
+   if(error){note('Search unavailable: '+error.message);return;}
+   const list=$('chatlist');list.querySelectorAll('[data-search-result="1"]').forEach(n=>n.remove());
+   const heading=document.createElement('div');heading.className='sectionlabel';heading.dataset.searchResult='1';heading.textContent='MEMBERS';list.prepend(heading);
+   (data||[]).filter(p=>p.id!==me.id).forEach(p=>{
+    const item=document.createElement('div');item.className='item';item.dataset.searchResult='1';
+    const av=document.createElement('div');av.className='avatar purple';av.textContent=(p.display_name||p.username).slice(0,2).toUpperCase();
+    const main=document.createElement('div');main.className='itemmain';
+    const top=document.createElement('div');top.className='itemtop';top.textContent=p.display_name||p.username;
+    const preview=document.createElement('div');preview.className='preview';preview.textContent='@'+p.username;
+    main.append(top,preview);item.append(av,main);
+    item.addEventListener('click',async()=>{
+     const {data:id,error}=await client.rpc('tp_create_direct_conversation',{p_username:p.username});
+     if(error){note('Could not start chat: '+error.message);return;}
+     await loadMyChats();await openConversation(id,p.display_name||p.username);
+    });
+    list.prepend(item);
+   });
+  },280);
+ });
+ function listFilter(term){
+  const q=term.toLowerCase();
+  $('chatlist').querySelectorAll('.item[data-live="1"]').forEach(el=>el.style.display=el.dataset.name.toLowerCase().includes(q)?'flex':'none');
+  $('chatlist').querySelectorAll('[data-search-result="1"]').forEach(el=>el.remove());
+ }
+
  const form=$('composer');
  form.addEventListener('submit',async function(e){
   if(!me||!activeConversationId)return;
