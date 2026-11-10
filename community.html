@@ -237,6 +237,7 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
    $('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;
   }).subscribe();
  }
+ window.tpOpenConversation=openConversation;
  async function loadMyChats(){
   if(!me)return;
   const {data,error}=await client.from('tp_conversation_members').select('conversation_id,tp_conversations(id,kind,title,created_at)').eq('user_id',me.id);
@@ -303,15 +304,14 @@ document.querySelectorAll('.railbtn').forEach(b=>b.addEventListener('click',()=>
   const title=prompt('Name your '+kind+':');if(!title?.trim())return;
   const {data,error}=await client.from('tp_conversations').insert({kind:kind.toLowerCase(),title:title.trim(),created_by:user.id,is_public:false}).select('id').single();
   if(error){alert('Could not create space: '+error.message);return;}
-  window.tpActiveConversationId=data.id;
-  document.getElementById('chatname').textContent=title.trim();
-  document.getElementById('chatstatus').textContent='Private '+kind+' · owner';
+  await loadMyChats();
+  await window.tpOpenConversation(data.id,title.trim());
   const invite=prompt('Invite a member by username now? (Leave blank to do this later):');
   if(invite?.trim()){
    const result=await client.rpc('tp_add_conversation_member',{p_conversation_id:data.id,p_username:invite.trim()});
-   if(result.error)alert('Space created. Invite failed: '+result.error.message);
-  }
-  alert('Space created. You are the owner. Add more members from the space menu once member tools are enabled.');
+   if(result.error)alert('Space created, but invite failed: '+result.error.message);
+   else note('Space created and member added.');
+  }else note('Your '+kind+' is live and ready.');
  };
  const more=document.querySelector('.headactions button[title="More"]');
  if(more)more.addEventListener('click',()=>{
